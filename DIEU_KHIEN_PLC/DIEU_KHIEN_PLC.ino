@@ -3,10 +3,11 @@
 #include "Keypad.h"
 #include "defineButton.h"
 #include "defineModbusPLC.h"
-#include "robot09.h"
+#include "robot15.h"
+//#include "robot09.h"
 //#include "robot25.h"
 //#include "robot23.h"
-
+//#include "robot26.h"
 
 const uint8_t ROWS = 7;
 const uint8_t COLS = 5;
@@ -59,6 +60,10 @@ void Show_Infor(void){
   if (PLC_SLAVE_ADDR == 9) {
     GLCD.printTxt(2,1,"ROBOT M09"); 
     GLCD.printTxt(3,0,"FUCHUSHIN 520T");
+  }
+  if (PLC_SLAVE_ADDR == 15) {
+    GLCD.printTxt(2,1,"ROBOT M15"); 
+    GLCD.printTxt(3,0,"FUCHUSHIN 450T");
   }
 }
 //================================================================
