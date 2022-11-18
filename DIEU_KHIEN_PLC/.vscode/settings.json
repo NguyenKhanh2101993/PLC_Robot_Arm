@@ -14,6 +14,7 @@
     "C_Cpp.errorSquiggles": "Disabled",
     "files.associations": {
         "*.rh": "cpp",
-        "AT25256.C": "cpp"
+        "AT25256.C": "cpp",
+        "xtr1common": "cpp"
     },
 }

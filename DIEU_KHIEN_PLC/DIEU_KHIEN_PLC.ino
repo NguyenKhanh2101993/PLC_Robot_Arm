@@ -3,8 +3,8 @@
 #include "Keypad.h"
 #include "defineButton.h"
 #include "defineModbusPLC.h"
-#include "robot15.h"
-//#include "robot09.h"
+//#include "robot15.h"
+#include "robot09.h"
 //#include "robot25.h"
 //#include "robot23.h"
 //#include "robot26.h"
@@ -41,6 +41,27 @@ ST7920GLCD              GLCD;
 int8_t getSingleKeypad(uint8_t state){
   int8_t result = NO_KEY_ACTIVE;
   result = KEYPAD.getKey(state);
+  return result;
+}
+// Chống dội phím 
+int8_t scanSingleKeypad(void){
+  //static uint32_t startTime; uint8_t scanTime = 50;
+  int8_t result = NO_KEY_ACTIVE; int8_t releaseKey = NO_KEY_ACTIVE; int8_t holdKey = NO_KEY_ACTIVE;
+  static int8_t newholdKey = NO_KEY_ACTIVE;
+  static bool holdKeyState = false;
+  if (holdKeyState == false) { holdKey = getSingleKeypad(HOLD); } // phat hien holdKey 
+  if (holdKey != NO_KEY_ACTIVE) {  // nếu có phím được hold
+    holdKeyState = true; newholdKey = holdKey; 
+    //Serial.print(newholdKey); Serial.print("-");
+  } 
+  if (holdKeyState) { 
+    releaseKey = getSingleKeypad(RELEASED); 
+    //Serial.print(newholdKey);
+  }
+  if (releaseKey == newholdKey && releaseKey != NO_KEY_ACTIVE) {
+    //Serial.print(releaseKey); Serial.println("end"); 
+    holdKeyState = false; newholdKey = NO_KEY_ACTIVE; result = releaseKey;
+  }
   return result;
 }
 //================================================================
@@ -144,6 +165,12 @@ void Show_list_modify_plc(void){
   GLCD.printTxt(2,0,"  Cai Tay Xoay ");
   GLCD.printTxt(3,0,"  Cai KiemTra SP");
 }
+void Show_list_modify_plc_page2(void){
+  GLCD.text_display_clear();
+  GLCD.printTxt(0,0," Che do Modify");
+  GLCD.printTxt(1,0,"  Cai CheDo Gap");
+  GLCD.printTxt(2,0,"  Cai Kich Loi ");
+}
 //============================================================================================
 //============================================================================================
 // Ghi giá trị 1 word value vào eeprom board slave bắt đầu ở địa chỉ addr
@@ -225,7 +252,7 @@ uint16_t read_input_from_PLC(void){
     //dataInput[1] = Read_SingleCoil_PLC(MONITOR_INPUT_START_ADDR + 8, 8);
     //resultInput = (dataInput[1] << 8) | (dataInput[0]);
     resultInput = Read_SingleCoil_PLC(MONITOR_INPUT_START_ADDR, 16);
-    Serial.println(resultInput);
+    //Serial.println(resultInput);
     return resultInput;
 }
 //============================================================================================
@@ -267,6 +294,35 @@ void Write_Coil_Phat_Hien_SP(uint16_t addr, uint8_t value){
       Write_SingleCoil_PLC(CB_CHAN_KHONG_SP_ADDR, value); Write_SingleCoil_PLC(CB_PHAT_HIEN_SP_ADDR, !value); Write_SingleCoil_PLC(CB_KEP_SP_ADDR, !value);}
     if (addr == CB_KEP_SP_ADDR) { 
       Write_SingleCoil_PLC(CB_KEP_SP_ADDR, value); Write_SingleCoil_PLC(CB_PHAT_HIEN_SP_ADDR, !value); Write_SingleCoil_PLC(CB_CHAN_KHONG_SP_ADDR, !value);}
+}
+//============================================================================================
+// Đọc giá trị coils chọn che do gắp sản phẩm
+// Đọc 3 bit M520 - M522
+uint8_t Read_Coil_Che_Do_Gap(void){
+    static uint8_t bitValue;
+    uint16_t value_cheDoGap = Read_SingleCoil_PLC(GAP_BEN_TINH_ADDR, 3);
+    bitValue = value_cheDoGap;
+    return bitValue;
+}
+//============================================================================================
+// Ghi giá trị set bit chọn chế độ gắp sản phẩm
+// Ghi 3 bit M520 - M522
+void Write_Coil_Che_Do_Gap(uint16_t addr, uint8_t value) {
+    if (addr == GAP_BEN_TINH_ADDR) { 
+      Write_SingleCoil_PLC(GAP_BEN_TINH_ADDR, value); Write_SingleCoil_PLC(GAP_BEN_DONG_ADDR, !value); Write_SingleCoil_PLC(GAP_MAT_TREN_ADDR, !value);}
+    if (addr == GAP_BEN_DONG_ADDR) { 
+      Write_SingleCoil_PLC(GAP_BEN_DONG_ADDR, value); Write_SingleCoil_PLC(GAP_BEN_TINH_ADDR, !value); Write_SingleCoil_PLC(GAP_MAT_TREN_ADDR, !value);}
+    if (addr == GAP_MAT_TREN_ADDR) { 
+      Write_SingleCoil_PLC(GAP_MAT_TREN_ADDR, value); Write_SingleCoil_PLC(GAP_BEN_TINH_ADDR, !value); Write_SingleCoil_PLC(GAP_BEN_DONG_ADDR, !value);}
+}
+//============================================================================================
+// Đọc giá trị coils cho phép lói sản phẩm
+// Đọc 1 bit M536
+uint8_t Read_Coil_Kich_Loi(void){
+    static uint8_t bitValue;
+    uint16_t value_cheDoGap = Read_SingleCoil_PLC(KICH_LOI_SP_ADDR, 1);
+    bitValue = value_cheDoGap;
+    return bitValue;
 }
 //============================================================================================
 // Đọc giá trị số nguyên trong thanh ghi D của PLC
@@ -353,34 +409,28 @@ void setup() {
 void loop() {
 //============================================================================================
 // Chống dội phím
-  COMMAND_HOLD = getSingleKeypad(HOLD);
-  if (COMMAND_HOLD == MODIFY) { while(true) { COMMAND_RELEASE = getSingleKeypad(RELEASED); if (COMMAND_RELEASE == MODIFY) { commandKeyPad = MODIFY; break; }}}
-  else if (COMMAND_HOLD == MANUAL) {while(true) { COMMAND_RELEASE = getSingleKeypad(RELEASED); if (COMMAND_RELEASE == MANUAL) { commandKeyPad = MANUAL; break; }}}
-  else if (COMMAND_HOLD == REMOTR) {while(true) { COMMAND_RELEASE = getSingleKeypad(RELEASED); if (COMMAND_RELEASE == REMOTR) { commandKeyPad = REMOTR; break; }} }
-  else if (COMMAND_HOLD == MONITOR) { while(true) { COMMAND_RELEASE = getSingleKeypad(RELEASED); if (COMMAND_RELEASE == MONITOR) { commandKeyPad = MONITOR; break; }}}
-  else if (COMMAND_HOLD == HOME) { while(true) { COMMAND_RELEASE = getSingleKeypad(RELEASED); if (COMMAND_RELEASE == HOME) { commandKeyPad = HOME; break; }}}
-  else if (COMMAND_HOLD == AUTO_1 || COMMAND_HOLD == AUTO_2) { while(true) { COMMAND_RELEASE = getSingleKeypad(RELEASED); if (COMMAND_RELEASE == AUTO_1 || COMMAND_RELEASE == AUTO_2) { commandKeyPad = AUTO_1; break; }} }
-  else if (COMMAND_HOLD == STOP_1 || COMMAND_HOLD == STOP_2) { while(true) { COMMAND_RELEASE = getSingleKeypad(RELEASED); if (COMMAND_RELEASE == STOP_1 || COMMAND_RELEASE == STOP_2) { commandKeyPad = STOP_1; break; }} }
-  else {COMMAND_HOLD = NO_KEY_ACTIVE; commandKeyPad = NO_KEY_ACTIVE; COMMAND_RELEASE = NO_KEY_ACTIVE; }
+  commandKeyPad = scanSingleKeypad();
 //============================================================================================
   if (commandKeyPad == MODIFY) {
-    GLCD.text_display_clear(); 
     Show_list_modify_plc();
     int8_t state_mode = MODIFY;
     int8_t pos = 0;
     int8_t index = Show_Pointer_Function(0,pos);
+    bool modifyPage01 = true;
     while(state_mode == MODIFY){
-      COMMAND = getSingleKeypad(RELEASED);
+      COMMAND = scanSingleKeypad();
       switch (COMMAND){
         case DOWN: pos ++; if (pos > 2) {pos = 2;} index = Show_Pointer_Function(0,pos); break;
         case UP:   pos --; if (pos < 0) {pos = 0;} index = Show_Pointer_Function(0,pos); break;
+        case RIGHT:  pos = 0; Show_list_modify_plc_page2(); index = Show_Pointer_Function(0,pos); modifyPage01 = false; break; // hiện thị trang cài đặt thứ 2
+        case LEFT:   pos = 0; Show_list_modify_plc(); index = Show_Pointer_Function(0,pos); modifyPage01 = true; break; // hiện thị trang cài đặt thứ 1
         case MODIFY:   
                       Show_Infor();
                       state_mode = -1; 
                       break;
         case PGDN:
           // cài đặt delay
-          if (index == TIMER_PLC_MODIFY) {  
+          if (index == TIMER_PLC_MODIFY && modifyPage01 == true) {  
             GLCD.text_display_clear();
             char delayvalue[9]; // Hiện thị giá trị delay đọc từ PLC
             char *delayArray;
@@ -389,7 +439,7 @@ void loop() {
             EaseString(delayString, 9);
             GLCD.printTxt(3,0,"Timer:"); GLCD.printTxt(3,3,"0s"); count_value = 0;
 
-            delayPacket = Read_Resgister_PLC (DELAY_XUONG_ADDR, 7); // Đọc 7 thanh ghi giá trị D512 -> D518
+            delayPacket = Read_Resgister_PLC (DELAY_XUONG_ADDR, 12); // Đọc 12 thanh ghi giá trị D512 -> D523
             delayArray = convert_delay_number_to_str(delayPacket[DELAY_XUONG*2]);
             
             GLCD.printTxt(0,0,"Cai Timer");
@@ -401,7 +451,7 @@ void loop() {
             
             bool timer_state = true;
             while(timer_state) {
-              COMMAND = getSingleKeypad(RELEASED);
+              COMMAND = scanSingleKeypad();
               switch (COMMAND) {
                 case GOBACK: 
                   timer_state = false; 
@@ -435,10 +485,10 @@ void loop() {
                   GLCD.printTxt(3,3,"0s"); count_value = 0;
 
                   if (vitri == DELAY_XUONG) {
-                    // ghi giá trị delaySetting vào thanh ghi Delay lấy sản phẩm
-                    Write_delayValue_to_PLC( DELAY_LAYSP_ADDR, delaySetting);
-                    // Đọc lại 7 thanh ghi delay giá trị D512 -> D518;
-                    delayPacket = Read_Resgister_PLC (DELAY_XUONG_ADDR, 7); 
+                    // ghi giá trị delaySetting vào thanh ghi duy trì lói sản phẩm
+                    Write_delayValue_to_PLC( DUYTRI_LOISP_ADDR, delaySetting);
+                    // Đọc lại 12 thanh ghi delay giá trị D512 -> D523;
+                    delayPacket = Read_Resgister_PLC (DELAY_XUONG_ADDR, 12); 
                     // Vị trí delay xuống lấy sản phẩm
                     GLCD.printTxt(1,0,"1.Delay Xuong  "); 
                     delayArray = convert_delay_number_to_str(delayPacket[DELAY_XUONG*2]);
@@ -472,13 +522,41 @@ void loop() {
                     //for (int i = 0; i < 9; i++) {delayvalue[i] = delayArray[i]; if (delayArray[i] == '\0') { break;}} 
                     GLCD.printTxt(2,3,delayArray);
                   }
-                    vitri++; if (vitri > 3) { vitri = 0; } 
-                    break;       
+                  if (vitri == DELAY_CLOSEMOLD) {
+                    // ghi giá trị delaySetting vào thanh ghi Delay lấy sản phẩm
+                    Write_delayValue_to_PLC( DELAY_LAYSP_ADDR, delaySetting);
+                    // Vị trí delay kích đóng khuôn
+                    GLCD.printTxt(1,0,"5.Delay khuon  "); 
+                    delayArray = convert_delay_number_to_str(delayPacket[DELAY_CLOSEMOLD*2]);
+                    //for (int i = 0; i < 9; i++) {delayvalue[i] = delayArray[i]; if (delayArray[i] == '\0') { break;}} 
+                    GLCD.printTxt(2,3,delayArray);
+                  }
+                  if (vitri == DELAY_LOISP) {
+                    // ghi giá trị delaySetting vào thanh ghi Delay kích đóng khuôn
+                    Write_delayValue_to_PLC( DELAY_CLOSEMOLD_ADDR, delaySetting);
+                    // Vị trí delay kích lói sản phẩm
+                    GLCD.printTxt(1,0,"6.Delay loiSP  "); 
+                    delayArray = convert_delay_number_to_str(delayPacket[DELAY_LOISP*2]);
+                    //for (int i = 0; i < 9; i++) {delayvalue[i] = delayArray[i]; if (delayArray[i] == '\0') { break;}} 
+                    GLCD.printTxt(2,3,delayArray);
+                  }
+                  if (vitri == DUYTRI_LOISP) {
+                    // ghi giá trị delaySetting vào thanh ghi Delay lói sản phẩm
+                    Write_delayValue_to_PLC( DELAY_LOISP_ADDR, delaySetting);
+                    // Vị trí delay duy trì lói sản phẩm
+                    GLCD.printTxt(1,0,"7.DuyTri loiSP "); 
+                    delayArray = convert_delay_number_to_str(delayPacket[DUYTRI_LOISP*2-1]);
+                    //for (int i = 0; i < 9; i++) {delayvalue[i] = delayArray[i]; if (delayArray[i] == '\0') { break;}} 
+                    GLCD.printTxt(2,3,delayArray);
+                  }
+
+                    vitri++; if (vitri > 6) { vitri = 0; } 
+                    break;
                 }
               }
           }
           // Cài đặt tay xoay
-          if (index == TAY_XOAY_PLC_MODIFY) {
+          if (index == TAY_XOAY_PLC_MODIFY && modifyPage01 == true) {
             // đọc giá trị cài đặt tay xoay từ PLC
             uint8_t tayxoayValue = 0; tayxoayValue = Read_Coil_Modify_TayXoay();
             GLCD.text_display_clear();
@@ -499,7 +577,7 @@ void loop() {
             bool tayxoayLen = true;
             uint8_t choose_tayxoay = 0;
             while(tayxoay_state){
-              COMMAND = getSingleKeypad(RELEASED);
+              COMMAND = scanSingleKeypad();
               switch (COMMAND) {
                 case XOAY_XUONG:  GLCD.printTxt(2,0,"  "); GLCD.printTxt(3,0,">>"); choose_tayxoay = XOAY_XUONG; break;
                 case XOAY_LEN:    GLCD.printTxt(2,0,">>"); GLCD.printTxt(3,0,"  "); choose_tayxoay = XOAY_LEN; break;
@@ -575,22 +653,22 @@ void loop() {
               }
             }
           }
-          if (index == PHAT_HIEN_SP_PLC_MODIFY) {
+          if (index == PHAT_HIEN_SP_PLC_MODIFY && modifyPage01 == true) {
             GLCD.text_display_clear();
             GLCD.printTxt(0,0,"Cai Phat Hien SP");
-            GLCD.printTxt(1,0,"  CB Chan Khong");
-            GLCD.printTxt(2,0,"  CB Tiem Can  ");
-            GLCD.printTxt(3,0,"  CB Kep       ");
+            GLCD.printTxt(1,0," CB TiemCan  ");
+            GLCD.printTxt(2,0," CB ChanKhong");
+            GLCD.printTxt(3,0," CB Kep      ");
             int8_t posIndex = 0; int8_t posMode = 0;
             // Đọc cờ M từ PLC xem trạng thái chọn sử dụng cảm biến phát hiện vật M533 -> M535
             uint8_t coilPhatHienSP = 0 ; coilPhatHienSP = Read_Coil_Phat_Hien_SP();
-            if (bitRead(coilPhatHienSP, CB_PHAT_HIEN_SP) == ON) { posMode = Show_Pointer_Function(0,CB_PHAT_HIEN_SP); posIndex = CB_PHAT_HIEN_SP;}
-            else if (bitRead(coilPhatHienSP, CB_CHAN_KHONG) == ON) { posMode =  Show_Pointer_Function(0,CB_CHAN_KHONG); posIndex = CB_CHAN_KHONG;}
-            else if (bitRead(coilPhatHienSP, CB_KEP) == ON) { posMode =  Show_Pointer_Function(0,CB_KEP); posIndex = CB_KEP;}
+            if (bitRead(coilPhatHienSP, CB_PHAT_HIEN_SP) == ON) { posMode = Show_Pointer_Function(0,CB_PHAT_HIEN_SP); posIndex = CB_PHAT_HIEN_SP; GLCD.printTxt(1,7,"ON");}
+            else if (bitRead(coilPhatHienSP, CB_CHAN_KHONG) == ON) { posMode =  Show_Pointer_Function(0,CB_CHAN_KHONG); posIndex = CB_CHAN_KHONG; GLCD.printTxt(2,7,"ON");}
+            else if (bitRead(coilPhatHienSP, CB_KEP) == ON) { posMode =  Show_Pointer_Function(0,CB_KEP); posIndex = CB_KEP; GLCD.printTxt(3,7,"ON");}
             else { GLCD.printTxt(1,0,"  ");  GLCD.printTxt(2,0,"  ");  GLCD.printTxt(3,0,"  ");}
             bool chedo_state = true;
             while(chedo_state) {
-              COMMAND = getSingleKeypad(RELEASED);
+              COMMAND = scanSingleKeypad();
                 switch (COMMAND){
             
                   case GOBACK:
@@ -603,14 +681,84 @@ void loop() {
                   case UP:   posIndex --; if (posIndex < 0) {posIndex = 0;} posMode = Show_Pointer_Function(0,posIndex); break;
 
                   case PGDN: 
-                    if (posIndex == CB_PHAT_HIEN_SP)  { Write_Coil_Phat_Hien_SP(CB_PHAT_HIEN_SP_ADDR, ON);}
-                    if (posIndex == CB_CHAN_KHONG)    { Write_Coil_Phat_Hien_SP(CB_CHAN_KHONG_SP_ADDR, ON); }
-                    if (posIndex == CB_KEP)           { Write_Coil_Phat_Hien_SP(CB_KEP_SP_ADDR, ON); }
+                    if (posIndex == CB_PHAT_HIEN_SP)  { Write_Coil_Phat_Hien_SP(CB_PHAT_HIEN_SP_ADDR, ON); GLCD.printTxt(1,7,"ON"); GLCD.printTxt(2,7,"  "); GLCD.printTxt(3,7,"  ");}
+                    if (posIndex == CB_CHAN_KHONG)    { Write_Coil_Phat_Hien_SP(CB_CHAN_KHONG_SP_ADDR, ON);GLCD.printTxt(1,7,"  "); GLCD.printTxt(2,7,"ON"); GLCD.printTxt(3,7,"  ");}
+                    if (posIndex == CB_KEP)           { Write_Coil_Phat_Hien_SP(CB_KEP_SP_ADDR, ON); GLCD.printTxt(1,7,"  "); GLCD.printTxt(2,7,"  "); GLCD.printTxt(3,7,"ON");}
                     break;
                 }
             }
-          } 
-        //Serial.println(index); 
+          }
+          // modifyPage02
+          //=======================================================================================
+          if (index == CHEDO_GAP_MODIFY && modifyPage01 == false) {
+            GLCD.text_display_clear();
+            GLCD.printTxt(0,0," Che Do Gap SP ");
+            GLCD.printTxt(1,0,"  Gap Ben Tinh "); // M520
+            GLCD.printTxt(2,0,"  Gap Ben Dong "); // M521
+            GLCD.printTxt(3,0,"  Gap Mat Tren "); // M522
+            int8_t posIndex = 0; int8_t posMode = 0;
+            // Đọc cờ M từ PLC xem trạng thái chọn sử dụng chế độ gắp sản phẩm M520 -> M522
+            uint8_t coilCheDoGap = 0 ; coilCheDoGap = Read_Coil_Che_Do_Gap();
+            if (bitRead(coilCheDoGap, GAP_BEN_TINH) == ON) { posMode = Show_Pointer_Function(0,GAP_BEN_TINH); posIndex = GAP_BEN_TINH;}
+            else if (bitRead(coilCheDoGap, GAP_BEN_DONG) == ON) { posMode =  Show_Pointer_Function(0,GAP_BEN_DONG); posIndex = GAP_BEN_DONG;}
+            else if (bitRead(coilCheDoGap, GAP_MAT_TREN) == ON) { posMode =  Show_Pointer_Function(0,GAP_MAT_TREN); posIndex = GAP_MAT_TREN;}
+            else { GLCD.printTxt(1,0,"  ");  GLCD.printTxt(2,0,"  ");  GLCD.printTxt(3,0,"  ");}
+            bool chedo_state = true;
+            while(chedo_state) {
+              COMMAND = scanSingleKeypad();
+                switch (COMMAND){
+            
+                  case GOBACK:
+                    chedo_state = false;
+                    Show_list_modify_plc_page2(); 
+                    index = Show_Pointer_Function(0,pos);
+                    break;
+
+                  case DOWN: posIndex ++; if (posIndex > 2) {posIndex = 2;} posMode = Show_Pointer_Function(0,posIndex); break;
+                  case UP:   posIndex --; if (posIndex < 0) {posIndex = 0;} posMode = Show_Pointer_Function(0,posIndex); break;
+
+                  case PGDN: 
+                    if (posIndex == GAP_BEN_TINH)  { Write_Coil_Che_Do_Gap(GAP_BEN_TINH_ADDR, ON);}
+                    if (posIndex == GAP_BEN_DONG)  { Write_Coil_Che_Do_Gap(GAP_BEN_DONG_ADDR, ON);}
+                    if (posIndex == GAP_MAT_TREN)  { Write_Coil_Che_Do_Gap(GAP_MAT_TREN_ADDR, ON);}
+                    break;
+                }
+            }
+          }
+          if (index == LOI_SP_MODIFY && modifyPage01 == false) {
+            GLCD.text_display_clear();
+            GLCD.printTxt(0,0," Che Do Loi SP ");
+            GLCD.printTxt(1,0,"  Bat Loi "); 
+            GLCD.printTxt(2,0,"  Tat Loi ");
+            GLCD.printTxt(3,0,"Kich Loi:"); 
+            int8_t posIndex = 0; int8_t posMode = 0;
+            // Đọc trạng thái kích lói sản phẩm từ PLC
+            uint8_t coilKichLoi = 0; coilKichLoi = Read_Coil_Kich_Loi();
+            if (bitRead(coilKichLoi, 0) == ON) { posMode = Show_Pointer_Function(0,0); posIndex = 0; GLCD.printTxt(3,6,"ON ");}
+            else {posMode = Show_Pointer_Function(0,1); posIndex = 1; GLCD.printTxt(3,6,"OFF");}
+            bool kichLoi = true;
+            while (kichLoi){
+              COMMAND = scanSingleKeypad();
+              switch (COMMAND){
+
+                case GOBACK:
+                  kichLoi = false;
+                  Show_list_modify_plc_page2(); 
+                  index = Show_Pointer_Function(0,pos);
+                  break;
+                
+                case DOWN: posIndex ++; if (posIndex > 1) {posIndex = 1;} posMode = Show_Pointer_Function(0,posIndex); break;
+                case UP:   posIndex --; if (posIndex < 0) {posIndex = 0;} posMode = Show_Pointer_Function(0,posIndex); break;
+
+                case PGDN: 
+                  if (posIndex == 0)  { Write_SingleCoil_PLC(KICH_LOI_SP_ADDR, ON); GLCD.printTxt(3,6,"ON "); }
+                  if (posIndex == 1)  { Write_SingleCoil_PLC(KICH_LOI_SP_ADDR, OFF);GLCD.printTxt(3,6,"OFF"); }
+                  break;
+              }
+            }
+          }
+          //=======================================================================================
+          //Serial.println(index); 
         break;
       }
     }
@@ -1468,7 +1616,7 @@ if (COMMAND == TEACH_MODE) {
       }
       else delay(1);
       
-      commandMonitor = getSingleKeypad(RELEASED);
+      commandMonitor = scanSingleKeypad();
       switch(commandMonitor){
         case MONITOR: monitorMode = false; Show_Infor(); break;
         case RIGHT: pageInput++; if (pageInput > 6) {pageInput = 6;} break;
@@ -1515,7 +1663,7 @@ if (COMMAND == TEACH_MODE) {
       NODE.writeSingleCoil(MANUAL_ADDR,OFF);
       int8_t COMMAND_MANUAL = NO_KEY_ACTIVE;
       while (COMMAND_MANUAL_MODE) {
-        COMMAND_MANUAL = getSingleKeypad(RELEASED);
+        COMMAND_MANUAL = scanSingleKeypad();
         switch (COMMAND_MANUAL){
           case XOAY_LEN: 
             commandCount = banXoayLen;
@@ -1747,7 +1895,7 @@ if (COMMAND == TEACH_MODE) {
       strJMcycleTime = convert_4float_number_to_str(reMotrPacket[2]);
       GLCD.printTxt(2,4,strJMcycleTime);
       // Thoát khỏi remotrMode
-      int8_t commandRemotr = getSingleKeypad(RELEASED);
+      int8_t commandRemotr = scanSingleKeypad();
       switch(commandRemotr){
         case REMOTR: remotrMode = false; Show_Infor(); break;
       }
