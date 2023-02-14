@@ -853,11 +853,11 @@ void loop() {
       static uint16_t inputSignals;
       static char *strbitInputSignals[16] = {}; // Lưu giá trị của inputSignals theo chuỗi ON/OFF
       int8_t commandCount  = -1;
-      //NODE.writeSingleCoil(MANUAL_ADDR,ON);
+      NODE.writeSingleCoil(MANUAL_ADDR,ON);
       // Đọc giá trị manual M168 kiểm tra đã vào chế độ manual chưa.
       while (true) {
           static uint8_t checkManualCnt = 0;
-          uint8_t state_manual = 1;//Read_SingleCoil_PLC(STATE_MANUAL_ADDR, 1);
+          uint8_t state_manual = Read_SingleCoil_PLC(STATE_MANUAL_ADDR, 1);
           // Đọc tín hiệu state_manual 10 lần nếu không có tín hiệu thì thoát vòng lặp
           // Không vào chế độ manual nữa, tránh bị treo bộ điều khiển
           checkManualCnt++; if (checkManualCnt == 10) {
@@ -875,7 +875,7 @@ void loop() {
           }
           delay(100);
       }
-      //NODE.writeSingleCoil(MANUAL_ADDR,OFF);
+      NODE.writeSingleCoil(MANUAL_ADDR,OFF);
       int8_t COMMAND_MANUAL = NO_KEY_ACTIVE;
       bool manualPage01 = true;
       while (COMMAND_MANUAL_MODE) {
@@ -954,11 +954,11 @@ void loop() {
                 stateRobot = idle;
                 uint8_t resultRequest = NODE.writeSingleCoil(RESET_MANUAL_ADDR,ON);
                 if (resultRequest == 0) { 
-                  COMMAND_MANUAL_MODE = false;
-                  GLCD.text_display_clear(); Show_Infor(); 
+                  COMMAND_MANUAL_MODE = false; 
                 } break;
       
             } //end switch
+            if (COMMAND_MANUAL_MODE == false) { GLCD.text_display_clear(); Show_Infor(); break;}
           } // end while
         } // end if 
         //-------------------------------------------------------------------------------------------
@@ -1057,16 +1057,17 @@ void loop() {
                   break;
 
               case LEFT:   Show_list_manual_plc_page1(); manualPage01 = true; break; // hiện thị trang cài đặt thứ 1
+
               case MANUAL:  // Exit the manual mode
                 commandCount = -1; manualAction = -1;
                 stateRobot = idle;
                 uint8_t resultRequest = NODE.writeSingleCoil(RESET_MANUAL_ADDR,ON);
                 if (resultRequest == 0) { 
                   COMMAND_MANUAL_MODE = false;
-                  GLCD.text_display_clear(); Show_Infor(); 
                 } break;
     
             } // end switch
+            if (COMMAND_MANUAL_MODE == false) { GLCD.text_display_clear(); Show_Infor(); break;}
           } // end while
         } // end if
 
