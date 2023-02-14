@@ -996,7 +996,7 @@ void loop() {
                   NODE.writeSingleCoil(MOTOR_SAU_TIEN_ADDR,ON);
                   //Serial.println("GH_motorTruoc_lui");
                 }
-                while (true){
+                while (pos == GH_motorTruoc || pos == GH_motorSau){
                   commandReleasePage2 = getSingleKeypad(RELEASED);
                   if (commandReleasePage2 == TAY_TOI) {
                     NODE.writeSingleCoil(MOTOR_TRUOC_TIEN_ADDR,OFF);
@@ -1014,7 +1014,7 @@ void loop() {
                   NODE.writeSingleCoil(MOTOR_SAU_LUI_ADDR,ON);
                   //Serial.println("GH_motorSau_lui");
                 }
-                while (true){
+                while (pos == GH_motorTruoc || pos == GH_motorSau){
                   commandReleasePage2 = getSingleKeypad(RELEASED);
                   if (commandReleasePage2 == TAY_LUI) {
                     NODE.writeSingleCoil(MOTOR_TRUOC_LUI_ADDR,OFF);
@@ -1024,36 +1024,38 @@ void loop() {
                 }  break;
 
               case TAY_LEN:
-                if (pos == servoZ) { delay(1); } 
-                while (true){
+                while (pos == servoZ){
                   commandReleasePage2 = getSingleKeypad(RELEASED);
                   if (commandReleasePage2 == TAY_LEN) {
                     break;
                   } 
-                  settingDistance--; if (settingDistance <= 500) {settingDistance = 500;}
+                  settingPos--; if (settingPos <= 10000) {settingPos = 10000;}
+                  settingDistance = settingPos*DO_PHAN_GIAI_SERVO_Z;
                   strSettingPos = ultoa(settingDistance, strSettingPosBuffer, 10);
                   GLCD.printTxt(3,5,strSettingPos);
+                  delay(10);
                 } break;
 
               case TAY_XUONG:
-                if (pos == servoZ) { delay(1); } 
-                while (true){
+                while (pos == servoZ){
                   commandReleasePage2 = getSingleKeypad(RELEASED);
                   if (commandReleasePage2 == TAY_XUONG) {
                     break;
                   } 
-                  settingDistance++; if (settingDistance >= 560) {settingDistance = 560;}
+                  settingPos++; if (settingPos >= 14000) {settingPos = 14000;}
+                  settingDistance = settingPos*DO_PHAN_GIAI_SERVO_Z;
                   strSettingPos = ultoa(settingDistance, strSettingPosBuffer, 10);
                   GLCD.printTxt(3,5,strSettingPos);
+                  delay(10);
                 } break;
 
               case PGDN: 
-                  settingPulse = settingDistance/DO_PHAN_GIAI_SERVO_Z;
                   // Lưu vào thanh ghi D526:
-                  NODE.setTransmitBuffer(0, lowWord(settingPulse));
-                  NODE.setTransmitBuffer(1, highWord(settingPulse));
+                  NODE.setTransmitBuffer(0, lowWord(settingPos));
+                  NODE.setTransmitBuffer(1, highWord(settingPos));
                   NODE.writeMultipleRegisters(SETTING_POINT_SERVO_Z_ADDR, 2);
                   break;
+
               case LEFT:   Show_list_manual_plc_page1(); manualPage01 = true; break; // hiện thị trang cài đặt thứ 1
               case MANUAL:  // Exit the manual mode
                 commandCount = -1; manualAction = -1;
