@@ -3,11 +3,13 @@
 #include "Keypad.h"
 #include "defineButton.h"
 #include "defineModbusPLC.h"
-#include "robot15.h"
+//#include "robot15.h"
 //#include "robot09.h"
 //#include "robot25.h"
 //#include "robot23.h"
 //#include "robot26.h"
+#include "robot22.h"
+
 
 const uint8_t ROWS = 7;
 const uint8_t COLS = 5;
@@ -84,6 +86,11 @@ void Show_Infor(void){
   }
   if (PLC_SLAVE_ADDR == 15) {
     GLCD.printTxt(2,1,"ROBOT M15"); 
+    GLCD.printTxt(3,0,"FUCHUSHIN 450T");
+  }
+  if (PLC_SLAVE_ADDR == 22) {
+    GLCD.printTxt(1,0,"HONGLINH_17TUOI");
+    GLCD.printTxt(2,1,"ROBOT M22"); 
     GLCD.printTxt(3,0,"FUCHUSHIN 450T");
   }
 }
@@ -170,6 +177,20 @@ void Show_list_modify_plc_page2(void){
   GLCD.printTxt(0,0," Che do Modify");
   GLCD.printTxt(1,0,"  Cai CheDo Gap");
   GLCD.printTxt(2,0,"  Cai Kich Loi ");
+}
+//============================================================================================
+void Show_list_manual_plc_page1(void){
+  GLCD.text_display_clear(); 
+  GLCD.printTxt(0,1,"MANUAL_MODE");
+  GLCD.printTxt(1,0,"Action:"); 
+  GLCD.printTxt(3,1, "Press PgDn");
+}
+void Show_list_manual_plc_page2(void){
+  GLCD.text_display_clear();
+  GLCD.printTxt(0,1,"MANUAL_MODE");
+  GLCD.printTxt(1,0,"  GH_MotorTruoc");
+  GLCD.printTxt(2,0,"  GH_MotorSau  ");
+  GLCD.printTxt(3,0,"  ServoZ:");
 }
 //============================================================================================
 //============================================================================================
@@ -832,11 +853,11 @@ void loop() {
       static uint16_t inputSignals;
       static char *strbitInputSignals[16] = {}; // Lưu giá trị của inputSignals theo chuỗi ON/OFF
       int8_t commandCount  = -1;
-      NODE.writeSingleCoil(MANUAL_ADDR,ON);
+      //NODE.writeSingleCoil(MANUAL_ADDR,ON);
       // Đọc giá trị manual M168 kiểm tra đã vào chế độ manual chưa.
       while (true) {
           static uint8_t checkManualCnt = 0;
-          uint8_t state_manual = Read_SingleCoil_PLC(STATE_MANUAL_ADDR, 1);
+          uint8_t state_manual = 1;//Read_SingleCoil_PLC(STATE_MANUAL_ADDR, 1);
           // Đọc tín hiệu state_manual 10 lần nếu không có tín hiệu thì thoát vòng lặp
           // Không vào chế độ manual nữa, tránh bị treo bộ điều khiển
           checkManualCnt++; if (checkManualCnt == 10) {
@@ -848,95 +869,205 @@ void loop() {
           // Nếu có tín hiệu state_manual thì vào manual mode
           if (bitRead(state_manual, 0) == ON) { 
             checkManualCnt = 0;
-            GLCD.text_display_clear(); 
-            GLCD.printTxt(0,1,"MANUAL_MODE");
-            GLCD.printTxt(1,0,"Action:"); 
-            GLCD.printTxt(3,1, "Press PgDn");
             COMMAND_MANUAL_MODE = true;
             stateRobot = stateManual;
-            //TIMER4_INTERRUPTS_ON;
             break; 
           }
           delay(100);
       }
-      NODE.writeSingleCoil(MANUAL_ADDR,OFF);
+      //NODE.writeSingleCoil(MANUAL_ADDR,OFF);
       int8_t COMMAND_MANUAL = NO_KEY_ACTIVE;
+      bool manualPage01 = true;
       while (COMMAND_MANUAL_MODE) {
-        COMMAND_MANUAL = scanSingleKeypad();
-        switch (COMMAND_MANUAL){
-          case XOAY_LEN: 
-            commandCount = banXoayLen;
-            GLCD.printTxt(2,0,">Tay xoay len  "); break;
+    
+        if (COMMAND_MANUAL_MODE == true && manualPage01 == true){
+          Show_list_manual_plc_page1();
+          while (manualPage01 == true) {
+            COMMAND_MANUAL = scanSingleKeypad();
+            switch (COMMAND_MANUAL){
+              case XOAY_LEN: 
+                commandCount = banXoayLen;
+                GLCD.printTxt(2,0,">Tay xoay len  "); break;
           
-          case XOAY_XUONG: 
-            commandCount = banXoayXuong;                                  
-            GLCD.printTxt(2,0,">Tay xoay xuong"); break;
+              case XOAY_XUONG: 
+                commandCount = banXoayXuong;                                  
+                GLCD.printTxt(2,0,">Tay xoay xuong"); break;
 
-          case TAY_TOI:
-            commandCount = penToi;                                     
-            GLCD.printTxt(2,0,">Tay di toi    "); break;
+              case TAY_TOI:
+                commandCount = penToi;                                     
+                GLCD.printTxt(2,0,">Tay di toi    "); break;
 
-          case TAY_LUI:
-            commandCount = penLui;                                     
-            GLCD.printTxt(2,0,">Tay di lui    "); break;
+              case TAY_LUI:
+                commandCount = penLui;                                     
+                GLCD.printTxt(2,0,">Tay di lui    "); break;
 
-          case TAY_LEN:
-            commandCount = penLen;                                            
-            GLCD.printTxt(2,0,">Tay di len    "); break;
+              case TAY_LEN:
+                commandCount = penLen;                                            
+                GLCD.printTxt(2,0,">Tay di len    "); break;
 
-          case TAY_XUONG:
-            commandCount = penXuong;                                      
-            GLCD.printTxt(2,0,">Tay di xuong  "); break;
+              case TAY_XUONG:
+                commandCount = penXuong;                                      
+                GLCD.printTxt(2,0,">Tay di xuong  "); break;
 
-          case VT_THA:
-          // Đưa tay máy về vị trí 0
-            commandCount = toiVtTha;                                      
-            GLCD.printTxt(2,0,">Toi vi tri tha"); break;
+              case VT_THA:
+              // Đưa tay máy về vị trí 0
+                commandCount = toiVtTha;                                      
+                GLCD.printTxt(2,0,">Toi vi tri tha"); break;
 
-          case VT_GAP:
-          // Đưa tay máy về vị trí gắp sản phẩm
-            commandCount = toiVtGap;                                       
-            GLCD.printTxt(2,0,">Toi vi tri gap"); break;
+              case VT_GAP:
+              // Đưa tay máy về vị trí gắp sản phẩm
+                commandCount = toiVtGap;                                       
+                GLCD.printTxt(2,0,">Toi vi tri gap"); break;
 
-          case KEP_SP:
-            commandCount = kepSanPham;                                          
-            GLCD.printTxt(2,0,">Kep san pham  "); break;
+              case KEP_SP:
+                commandCount = kepSanPham;                                          
+                GLCD.printTxt(2,0,">Kep san pham  "); break;
 
-          case HUT_SP:
-            commandCount = hutSanPham;
-            GLCD.printTxt(2,0,">Hut san pham  "); break;
+              case HUT_SP:
+                commandCount = hutSanPham;
+                GLCD.printTxt(2,0,">Hut san pham  "); break;
 
-          case THA_SP:
-            commandCount = thaSanPham;                                    
-            GLCD.printTxt(2,0,">Tha san pham  "); break;
+              case THA_SP:
+                commandCount = thaSanPham;                                    
+                GLCD.printTxt(2,0,">Tha san pham  "); break;
 
-          case PGDN:      
-            Send_manual_command_to_PLC(commandCount);
-            manualAction = commandCount;
-            break; 
+              case PGDN:      
+                Send_manual_command_to_PLC(commandCount);
+                manualAction = commandCount;
+                break; 
 
-          case STOP_1:
-          case STOP_2:
-            commandCount = -1; manualAction = -1;
-            Write_SingleCoil_PLC(TOI_VT_THA_ADDR, OFF); 
-            Write_SingleCoil_PLC(TOI_VT_GAP_ADDR, OFF);
-            GLCD.text_display_clear(); 
-            GLCD.printTxt(0,1,"MANUAL_MODE");
-            GLCD.printTxt(1,0,"Action:"); 
-            GLCD.printTxt(3,1, "Press PgDn");
-            break;
+              case STOP_1:
+              case STOP_2:
+                commandCount = -1; manualAction = -1;
+                Write_SingleCoil_PLC(TOI_VT_THA_ADDR, OFF); 
+                Write_SingleCoil_PLC(TOI_VT_GAP_ADDR, OFF);
+                GLCD.text_display_clear(); 
+                GLCD.printTxt(0,1,"MANUAL_MODE");
+                GLCD.printTxt(1,0,"Action:"); 
+                GLCD.printTxt(3,1, "Press PgDn");
+                break;
+              // hiện thị trang cài đặt thứ 2
+              case RIGHT:  if (PLC_SLAVE_ADDR == 22) { manualPage01 = false;} break;
+              
+              case MANUAL:  // Exit the manual mode
+                commandCount = -1; manualAction = -1;
+                stateRobot = idle;
+                uint8_t resultRequest = NODE.writeSingleCoil(RESET_MANUAL_ADDR,ON);
+                if (resultRequest == 0) { 
+                  COMMAND_MANUAL_MODE = false;
+                  GLCD.text_display_clear(); Show_Infor(); 
+                } break;
+      
+            } //end switch
+          } // end while
+        } // end if 
+        //-------------------------------------------------------------------------------------------
+        if (COMMAND_MANUAL_MODE == true && manualPage01 == false){
+          Show_list_manual_plc_page2();
+          int8_t pos = 0;
+          int8_t index = Show_Pointer_Function(0,pos);
+          int8_t commandHoldPage02 = NO_KEY_ACTIVE;
+          int8_t commandReleasePage2 = NO_KEY_ACTIVE;
+          uint16_t count = 0; char *strcount; char strBufferCount[16];
+          uint16_t *settingPosPacket;  uint32_t settingPos; uint32_t settingPosIndex[2];
+          uint32_t settingDistance; uint32_t settingPulse;
+          char *strSettingPos; char strSettingPosBuffer[16];
+          // đọc giá trị D526 lưu số xung cài đặt trục Z lên xuống 
+          settingPosPacket =  Read_Resgister_PLC(SETTING_POINT_SERVO_Z_ADDR, 2); 
+          settingPosIndex[0] = settingPosPacket[0]; settingPosIndex[1] = settingPosPacket[1]; 
+          settingPos = settingPosIndex[1] << 16 | settingPosIndex[0]; 
+          settingDistance = settingPos*DO_PHAN_GIAI_SERVO_Z; // đổi sang đơn vị mm
+          // đổi giá trị D526 sang string để hiện thị trên GLCD
+          strSettingPos = ultoa(settingDistance, strSettingPosBuffer, 10);
+          GLCD.printTxt(3,5,strSettingPos);
 
-          case MANUAL:  // Exit the manual mode
-            commandCount = -1; manualAction = -1;
-            //TIMER4_INTERRUPTS_OFF;
-            stateRobot = idle;
-            uint8_t resultRequest = NODE.writeSingleCoil(RESET_MANUAL_ADDR,ON);
-            if (resultRequest == 0) { 
-              COMMAND_MANUAL_MODE = false;
-              GLCD.text_display_clear(); Show_Infor(); 
-              break;
-            }
-        } // end switch
+          while (manualPage01 == false){
+            commandHoldPage02 = getSingleKeypad(HOLD);
+            switch (commandHoldPage02)
+            {
+              case DOWN: pos ++; if (pos > 2) {pos = 2;} index = Show_Pointer_Function(0,pos); break;
+              case UP:   pos --; if (pos < 0) {pos = 0;} index = Show_Pointer_Function(0,pos); break;
+              case TAY_TOI:
+                if (pos == GH_motorTruoc) {
+                  NODE.writeSingleCoil(MOTOR_TRUOC_TIEN_ADDR,ON);
+                  //Serial.println("GH_motorTruoc_toi");
+                }
+                if (pos == GH_motorSau) {
+                  NODE.writeSingleCoil(MOTOR_SAU_TIEN_ADDR,ON);
+                  //Serial.println("GH_motorTruoc_lui");
+                }
+                while (true){
+                  commandReleasePage2 = getSingleKeypad(RELEASED);
+                  if (commandReleasePage2 == TAY_TOI) {
+                    NODE.writeSingleCoil(MOTOR_TRUOC_TIEN_ADDR,OFF);
+                    NODE.writeSingleCoil(MOTOR_SAU_TIEN_ADDR,OFF);
+                    break;
+                  }
+                }  break;
+
+              case TAY_LUI:
+                if (pos == GH_motorTruoc) {
+                  NODE.writeSingleCoil(MOTOR_TRUOC_LUI_ADDR,ON);
+                  //Serial.println("GH_motorTruoc_lui");
+                }
+                if (pos == GH_motorSau) {
+                  NODE.writeSingleCoil(MOTOR_SAU_LUI_ADDR,ON);
+                  //Serial.println("GH_motorSau_lui");
+                }
+                while (true){
+                  commandReleasePage2 = getSingleKeypad(RELEASED);
+                  if (commandReleasePage2 == TAY_LUI) {
+                    NODE.writeSingleCoil(MOTOR_TRUOC_LUI_ADDR,OFF);
+                    NODE.writeSingleCoil(MOTOR_SAU_LUI_ADDR,OFF);
+                    break;
+                  }
+                }  break;
+
+              case TAY_LEN:
+                if (pos == servoZ) { delay(1); } 
+                while (true){
+                  commandReleasePage2 = getSingleKeypad(RELEASED);
+                  if (commandReleasePage2 == TAY_LEN) {
+                    break;
+                  } 
+                  settingDistance--; if (settingDistance <= 500) {settingDistance = 500;}
+                  strSettingPos = ultoa(settingDistance, strSettingPosBuffer, 10);
+                  GLCD.printTxt(3,5,strSettingPos);
+                } break;
+
+              case TAY_XUONG:
+                if (pos == servoZ) { delay(1); } 
+                while (true){
+                  commandReleasePage2 = getSingleKeypad(RELEASED);
+                  if (commandReleasePage2 == TAY_XUONG) {
+                    break;
+                  } 
+                  settingDistance++; if (settingDistance >= 560) {settingDistance = 560;}
+                  strSettingPos = ultoa(settingDistance, strSettingPosBuffer, 10);
+                  GLCD.printTxt(3,5,strSettingPos);
+                } break;
+
+              case PGDN: 
+                  settingPulse = settingDistance/DO_PHAN_GIAI_SERVO_Z;
+                  // Lưu vào thanh ghi D526:
+                  NODE.setTransmitBuffer(0, lowWord(settingPulse));
+                  NODE.setTransmitBuffer(1, highWord(settingPulse));
+                  NODE.writeMultipleRegisters(SETTING_POINT_SERVO_Z_ADDR, 2);
+                  break;
+              case LEFT:   Show_list_manual_plc_page1(); manualPage01 = true; break; // hiện thị trang cài đặt thứ 1
+              case MANUAL:  // Exit the manual mode
+                commandCount = -1; manualAction = -1;
+                stateRobot = idle;
+                uint8_t resultRequest = NODE.writeSingleCoil(RESET_MANUAL_ADDR,ON);
+                if (resultRequest == 0) { 
+                  COMMAND_MANUAL_MODE = false;
+                  GLCD.text_display_clear(); Show_Infor(); 
+                } break;
+    
+            } // end switch
+          } // end while
+        } // end if
+
       } // end while COMMAND_MANUAL_MODE
   }
 //================================================================================================================
@@ -1045,6 +1176,7 @@ void loop() {
       if (bitRead(autoState, 0) == ON) { 
         Write_SingleCoil_PLC(AUTO_COIL_ADDR, OFF); 
         GLCD.printTxt(2,0," AUTO RUNNING  ");
+        GLCD.printTxt(3,0,"MAY DANG CHAY NE");
         stateRobot = stateAutoRun;
         checkAutoCnt = 0;
         break; 
@@ -1056,7 +1188,7 @@ void loop() {
       if (checkAutoCnt == 100) { 
         Write_SingleCoil_PLC(AUTO_COIL_ADDR, OFF);  
         GLCD.printTxt(2,0,"AUTO RUN FAILED");
-        GLCD.printTxt(3,0,"KiemTra TinHieu");
+        GLCD.printTxt(3,0,"KiemTra TinHieu ");
         checkAutoCnt = 0;
         break;
       }
